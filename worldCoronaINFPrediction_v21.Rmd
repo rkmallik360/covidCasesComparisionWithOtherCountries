@@ -1,0 +1,315 @@
+---
+title: "Comparision of Corona Infection Cases of Nepal With Countries Recovered From Infections"
+output:
+  html_document: default
+  pdf_document: default
+---
+R.K.Mallik,
+Phd Candidate, Civil Engineering
+IOE, Pulchowk Campus
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+### Summary
+
+Nepal is compared with other 18 countries recovered from corona infection.
+We can clearly see three types of recover pattern.
+Comparing with these three recovering pattern gives some useful insight that can help to estimate maximum possible corona case in Nepal.
+
+### Import the Important Library
+
+```{r import libraries}
+library(plotly)
+library(TTR)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+```
+
+### Reading Data
+
+```{r read csv file}
+coronaWorldData<-read.csv(file = "owid-covid-data3.csv") # From Our World with data
+data1<-data.frame(coronaWorldData)
+data1[is.na(data1)]<-0
+names(data1)
+data1$date<-as.Date(data1$date)
+```
+
+### Selecting Important features
+
+Data has in total 32 features out of which 8 features has been selected for the analysis for this time the two features has been presented 
+
++ new_cases_per_million 
++ total_cases_per_million
+
+The population of the countries are normalized to 1 Million so that we can logically compare seviarity of the virus spreading 
+```{r}
+features<-c("location","date","new_cases","total_cases","new_deaths",
+            "total_deaths","new_cases_per_million","total_cases_per_million","population_density")
+```
+
+### Subset data for analysis
+
+Subset of the data is collected as per the selected features.
+```{r}
+data_features<-data1[,features]
+names(data_features)
+
+```
+
+
+### Collective plot of different countries
+
+17 Countries that have controlled corona virus outbreaks are selected. Three groups are made based up on the performance of country controlling virus spreading
+
++Group 1: Country with well performance
++Group 2: Country with lots of struggle but controlled the virus spreding
++Group3: Country controlled viruse passing through worst possible virus spreading
+
+
+```{r}
+contrlCountry1<-c("Australia","Nepal","India","South Korea","Japan") # Group 1
+contrlCountry2<-c("Germany","Denmark","Nepal","India","Turkey","France","Netherlands") # Group 2"Austria","Norway",
+contrlCountry3<-c("Nepal","India","Italy","Spain","Iceland","Switzerland","Belgium","United Kingdom") # Group 3
+
+contrlData1<-data_features%>%filter(location == contrlCountry1)
+contrlData2<-data_features%>%filter(location == contrlCountry2)
+contrlData3<-data_features%>%filter(location == contrlCountry3)
+countryData_nep_ind<-data_features%>%filter(location == c("Nepal","India"))
+```
+### Comparing Nepal and India Daily New case 
+```{r}
+ggplot(data=countryData_nep_ind,aes(group=location))+
+  geom_line(aes(x=date,y=new_cases_per_million,color=location))+
+  scale_shape(solid=FALSE)+
+  ggtitle(" Comparision of Nepal With Countries With Best Control on Virus Spreading")+
+  xlab("Expected Total cases for Nepal = 7,275 (BEST PERFORMANCE REQUIRED)")+
+  ylab("Total Infection Cases Per Million")+
+  theme(axis.text.x=element_text(angle=90,hjust=1))
+
+```
+
+
+
+
+
+
+### Comparing Nepal and India case with Better performing countries
+
+```{r}
+ggplot(data=contrlData1,aes(group=location))+
+  geom_line(aes(x=date,y=total_cases_per_million,color=location))+
+  scale_shape(solid=FALSE)+
+  ggtitle(" Comparision of Nepal With Countries With Best Control on Virus Spreading")+
+  xlab("Expected Total cases for Nepal = 7,275 (BEST PERFORMANCE REQUIRED)")+
+  ylab("Total Infection Cases Per Million")+
+  theme(axis.text.x=element_text(angle=90,hjust=1))
+
+#n = M/(1+M*exp(-c*factor(contrlCountry1$date)))
+
+```
+### FITTING WITH SIGMOID FUNCTION BY R.K.Mallik
+```{r}
+countryAustralia<-c("Australia") # Group 1
+contrlAustralia<-data_features%>%filter(location == countryAustralia)
+contrlAustralia1<-contrlAustralia[contrlAustralia$total_cases_per_million>1,]
+contrlAustralia1$total_cases_per_million
+M = max(contrlAustralia1$total_cases_per_million)# Saturation value
+t<-1:length(contrlAustralia1$total_cases_per_million)
+err=NULL
+for (i in 1:100){
+  c = 0.01*i
+  n = M/(1+M*exp(-c*t))
+  sq = (n-contrlAustralia1$total_cases_per_million)**2
+  err[i] = mean(sqrt(sq))
+}
+c1=which(err==min(err))*0.01
+c1
+n1 = M/(1+M*exp(-c1*t))
+
+contrlAustralia1$pred<-n1
+
+ggplot(data=contrlAustralia1)+
+  geom_line(aes(x=date,y=total_cases_per_million,color="observations"))+
+  geom_line(aes(x=date,y=pred,color="sigmoid_fitted"))+
+  scale_shape(solid=FALSE)+
+  ggtitle(" Sigmoid Curve Fitting for cumulative daily cases")+
+  xlab("Date")+
+  ylab("Cumulative Cases")+
+  theme(axis.text.x=element_text(angle=90,hjust=1))
+
+
+
+```
+### SIGMOID FITTING FOR THE JAPAN BY R.K.Mallik
+```{r}
+countryJapan<-c("Japan") # Group 1
+contrlJapan<-data_features%>%filter(location == countryJapan)
+contrlJapan1<-contrlJapan[contrlJapan$total_cases_per_million>1,]
+contrlJapan$total_cases_per_million
+contrlJapan1$total_cases_per_million
+M = max(contrlJapan1$total_cases_per_million)# Saturation value
+M
+t<-1:length(contrlJapan1$total_cases_per_million)
+k=1
+for (i in 1:100){
+  c = 0.01*i
+  n = M*(1-exp(-c*t))/(1+k*M*exp(-c*t))
+  sq = (n-contrlJapan1$total_cases_per_million)**2
+  err[i] = mean(sqrt(sq))
+}
+c1=which(err==min(err))*0.01
+c1
+n1 = M*(1-exp(-c1*t))/(1+M*exp(-c1*t))
+
+contrlJapan1$pred<-n1
+
+ggplot(data=contrlJapan1)+
+  geom_line(aes(x=date,y=total_cases_per_million,color="observations"))+
+  geom_line(aes(x=date,y=pred,color="sigmoid_fitted"))+
+  scale_shape(solid=FALSE)+
+  ggtitle(" Sigmoid Curve Fitting for cumulative daily cases")+
+  xlab("Date")+
+  ylab("Cumulative Cases")+
+  theme(axis.text.x=element_text(angle=90,hjust=1))
+
+```
+
+
+### SIGMOID FITTING FOR THE NEPAL
+### Reading Data of Nepal
+```{r}
+coronaCasesNepal<-read.csv(file = "coronaNepal1.csv")
+data1<-data.frame(coronaCasesNepal)
+str(data1)
+y<-data1$NewCases
+total_cases<-cumsum(y)
+total_cases_pm<-total_cases/29.1
+data1$total_pm<-total_cases_pm
+data1$total_pm
+```
+
+```{r}
+contrlNepal1<-data1[data1$total_pm>1,]
+contrlNepal1$total_pm
+date<-contrlNepal1$Date
+Nepal_ts<-ts(contrlNepal1$total_pm,frequency = 1)
+t = 1:length(contrlNepal1$total_pm)
+c3 = 0.09
+t1 = 37
+y1 = 30.206186
+n1 = 1/(1/y1+exp(-c3*t)-exp(-c3*t1))
+n1_ts<-ts(n1,frequency = 1)
+contrlNepal1$pred<-n1
+ggplot(data=contrlNepal1)+
+  geom_line(aes(x=date,y=total_pm,color="total_pm"))+
+  geom_line(aes(x=date,y=pred,color="sigmoid_fitted"))+
+  scale_shape(solid=FALSE)+
+  ggtitle(" Sigmoid Curve Fitting for cumulative daily cases")+
+  xlab("Date")+
+  ylab("Cumulative Cases")+
+  theme(axis.text.x=element_text(angle=90,hjust=1))
+ts.plot(Nepal_ts,n1_ts,
+        gpars=list(main = "CoronaSigmoidFunction Fitted With Nepal Cumulative Case",xlab="Date Count From 21st April",ylab="Cumulative Infection",lty=c(1,6)))
+Nepal_ts
+n1_ts
+```
+
+```{r}
+require(graphics)
+x = 1:200
+c3 = 0.10101
+t1 = 46
+y1 = 99.862543
+n2 = 1/(1/y1+exp(-c3*x)-exp(-c3*t1))
+n2_ts<-ts(n2,frequency=1)
+ts.plot(Nepal_ts,n2_ts,
+        gpars=list(main = "CoronaSigmoidFunction Fitted With Nepal Cumulative Case",xlab="Date Count From 21st April",ylab="Cumulative Infection",lty=c(1,6)))
+n2_ts
+```
+
+```{r}
+M = 500
+x = 1:100
+c3 = 0.1
+n2 = 1/(1/M+exp(-c3*x))
+plot(x,n2)
+```
+
+
+### Comparing Nepal and India case with Just good performing countries
+
+```{r}
+ggplot(data=contrlData2,aes(group=location))+
+  geom_line(aes(x=date,y=total_cases_per_million,color=location))+
+  scale_shape(solid=FALSE)+
+  ggtitle(" Comparision of Nepal With Countries With good control on virus spreading")+
+  xlab("Expected Total cases for Nepal = 65,475 (POSSIBLE WITH BETTER PLANNING)")+
+  ylab("Total Infection Cases Per Million")+
+  theme(axis.text.x=element_text(angle=90,hjust=1))
+
+```
+```{r population density}
+ggplot(data=contrlData2,aes(group=location))+
+  geom_histogram(aes(x=population_density,color=location))+
+  scale_shape(solid=FALSE)+
+  ggtitle(" Comparision of Nepal With Countries With good control on virus spreading")+
+  xlab("Expected Total cases for Nepal = 65,475 (POSSIBLE WITH BETTER PLANNING)")+
+  ylab("Total Infection Cases Per Million")+
+  theme(axis.text.x=element_text(angle=90,hjust=1))
+```
+### Comparing Nepal and India case with worst performing controlled countries
+
+```{r}
+ggplot(data=contrlData3,aes(group=location))+
+  geom_line(aes(x=date,y=total_cases_per_million,color=location))+
+  scale_shape(solid=FALSE)+
+  ggtitle(" Comparision of Nepal With Countries Recovered From Worst Virus Spreading Case")+
+  xlab("Expected Total cases for Nepal = 1,45,500 (POSSIBLE WITH GOOD PLANNING WITH HARD TIME)")+
+  ylab("Total Infection Cases Per Million")+
+  theme(axis.text.x=element_text(angle=90,hjust=1))
+
+```
+```{r}
+ggplot(data=contrlData3,aes(group=location))+
+  geom_histogram(aes(x=population_density,color=location))+
+  scale_shape(solid=FALSE)+
+  ggtitle(" Comparision of Nepal With Countries Recovered From Worst Virus Spreading Case")+
+  xlab("Expected Total cases for Nepal = 1,45,500 (POSSIBLE WITH GOOD PLANNING WITH HARD TIME)")+
+  ylab("Total Infection Cases Per Million")+
+  theme(axis.text.x=element_text(angle=90,hjust=1))
+
+```
+
+### FITTING WITH SIGMOID FUNCTION
+```{r}
+contrlData1
+total_per_million<-contrlData1$total_cases_per_million
+total_case_ts<-ts(total_per_million,frequency=1)
+x<-0:300
+theta = 0.01
+alpha = 0.05
+y = M/(1+alpha*exp(-theta*x))
+plot(y~x)
+
+```
+
+
+
+
+
+
+### CONCLUSION FROM THE COMPARISION
+
+Grouping 18 countries as per their performance in cotrol for the spreading of corona virus, we can expect Nepal beahave similar.
+
++ With the best possible planning for controlling spread of corona virus expected maximum corona virus case will be approximately : 7,225 No { Min = 6,550 & Max = 8,000 }
++ With the better planning for controlling spread, Expected corona infection case:65,475 No. { Min = 52,380, Max = 80,025}
++ With just good planning and controlling mechanism, Expected corona infection case:1,45,500 {min = 1,01,850 & Max = 1,54,230}
+
+### LIMITATIONS OF THESE COMPARISION
+
++ The immunity power of all the persions are assumed as similar
++ The population density has major impacts as it causes automatic social distancing and it has been grouped as 3 nos only. Its effect can be seen through deep learning techniques and it is under study.
++ All the people in the societies are not vaccined and equally succeptible for the infection.
